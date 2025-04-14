@@ -1,0 +1,90 @@
+#!/usr/bin/env bash
+
+set -e
+set -o pipefail
+
+install_octopuscli() {
+  local install_type=$1
+  local version=$2
+  local install_path=$3
+  local operating_system="$(uname | tr '[:upper:]' '[:lower:]')"
+  local arch="$(get_arch)"
+  local platform="${operating_system}_${arch}"
+  local bin_install_path="$install_path/bin"
+  local binary_path="$bin_install_path/octopus"
+  local download_url
+  download_url="$(get_download_url "$version" $platform)"
+
+  if [ "$TMPDIR" = "" ]; then
+    local tmp_download_dir=$(mktemp -d -t octopuscli_XXXXXX)
+  else
+    local tmp_download_dir=$TMPDIR
+  fi
+
+  local download_path="$tmp_download_dir/$(get_filename $version $platform)"
+
+  echo "Downloading octopus cli from ${download_url} to ${download_path}"
+
+  # capture error message from curl in memory
+  curl --retry 10 --retry-delay 2 -fLo $download_path $download_url 2> >(tee /tmp/curl_error >&2)
+  ERROR=$(</tmp/curl_error)
+
+  # retry with http1.1 if http2 error
+  if [[ $ERROR == *"HTTP/2 stream 0 was not closed cleanly"* ]]; then
+   echo $ERROR
+   echo "Retrying with --http1.1"
+   curl --http1.1 --retry 10 --retry-delay 2 -fLo $download_path $download_url
+  fi
+
+  if [ $? -ne 0 ]; then
+   echo $ERROR
+   echo "Failed to download octopus cli from ${download_url}"
+   exit 1
+  fi
+
+  echo "Creating bin directory"
+  mkdir -p "${bin_install_path}"
+
+  echo "Cleaning previous binaries"
+  rm -f $binary_path 2>/dev/null || true
+
+  echo "Copying binary"
+  tar -zxf ${download_path} --directory $tmp_download_dir
+  cp ${tmp_download_dir}/octopus ${bin_install_path}
+  chmod +x ${binary_path}
+}
+
+get_arch() {
+  if [[ $ASDF_OCTOPUSCLI_OVERWRITE_ARCH != "" ]]; then
+    echo "$ASDF_OCTOPUSCLI_OVERWRITE_ARCH"
+  else
+    ARCH=$(uname -m)
+    case $ARCH in
+      arm64) ARCH="arm64";;
+      aarch64) ARCH="arm64";;
+      x86_64) ARCH="amd64";;
+	  *)
+		echo "Unsupported architecture: $ARCH"
+		exit 1
+		;;
+    esac
+    echo "$ARCH"
+  fi
+}
+
+get_filename() {
+  local version="$1"
+  local platform="$2"
+
+  echo "octopus_${version}_${platform}.tar.gz"
+}
+
+get_download_url() {
+  local version="$1"
+  local platform="$2"
+  local filename="$(get_filename $version $platform)"
+
+  echo "https://github.com/OctopusDeploy/cli/releases/download/v${version}/${filename}"
+}
+
+install_octopuscli "$ASDF_INSTALL_TYPE" "$ASDF_INSTALL_VERSION" "$ASDF_INSTALL_PATH"
