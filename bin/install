@@ -8,6 +8,12 @@ install_octopuscli() {
   local version=$2
   local install_path=$3
   local operating_system="$(uname | tr '[:upper:]' '[:lower:]')"
+
+  # Update the operating system name for macOS
+  if [ $operating_system = "darwin" ]; then
+	operating_system="macOS"
+  fi
+
   local arch="$(get_arch)"
   local platform="${operating_system}_${arch}"
   local bin_install_path="$install_path/bin"
