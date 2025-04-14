@@ -2,10 +2,16 @@
 
 [Octopus Deploy CLI](https://github.com/OctopusDeploy/cli) plugin for [asdf](https://github.com/asdf-vm/asdf) version manager
 
-## Install
+## Install (pre-0.16.0)
 
 ```
 asdf plugin-add octopuscli https://github.com/exzeo-devops/asdf-octopuscli.git
+```
+
+## Install (> 0.16.0)
+
+```
+asdf plugin add octopuscli https://github.com/exzeo-devops/asdf-octopuscli.git
 ```
 
 ### Environment Variable Options
